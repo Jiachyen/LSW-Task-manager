@@ -4,7 +4,7 @@ from auth import *
 import os
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # Change this in production
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')  # Use environment variable in production
 
 # Initialize database and add some sample data
 def setup_sample_data():
@@ -162,4 +162,12 @@ def delete_own_task():
     return redirect(url_for('home'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000) 
+    # Get port from environment variable (for deployment) or use 5000 for local development
+    port = int(os.environ.get('PORT', 5000))
+    
+    # For deployment platforms, bind to 0.0.0.0 to accept external connections
+    # For local development, you can use 'localhost' or '127.0.0.1'
+    host = '0.0.0.0' if os.environ.get('PORT') else '127.0.0.1'
+    
+    print(f"Starting LSW Task Manager on {host}:{port}")
+    app.run(debug=False, host=host, port=port) 
