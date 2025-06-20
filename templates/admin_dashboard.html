@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  /* Your existing styles here */
+  .container {
+    max-width: 900px;
+    margin: 2em auto;
+    padding: 1.5em;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  h1, h2 {
+    margin-bottom: 1em;
+    color: #333;
+  }
+
+  .user-section {
+    margin-bottom: 3em;
+  }
+
+  .user-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .user-header h2 {
+    margin: 0;
+  }
+
+  .edit-btn {
+    background-color: black;
+    border: none;
+    color: yellow;
+    padding: 0.3em 0.8em;
+    font-size: 0.9em;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .edit-btn:hover {
+    background-color: #333; /* dark gray on hover */
+    color: #ffeb3b; /* bright yellow on hover */
+  }
+
+  .ta {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 2em;
+  }
+
+  .task-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75em 1em;
+    margin-bottom: 0.75em;
+    border-bottom: 1px solid #eee;
+    font-size: 1.1em;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+  }
+
+  .task-item span {
+    flex: 1;
+    color: #333;
+  }
+
+  .completed {
+    color: green;
+    font-weight: bold;
+  }
+
+  .not-completed {
+    color: red;
+    font-weight: bold;
+  }
+</style>
+
+<div class="container">
+  <h1>Admin Dashboard</h1>
+
+  {% for username, tasks in users_tasks.items() %}
+    <div class="user-section">
+      <div class="user-header">
+        <h2>User: {{ username }}</h2>
+        <!-- Edit button beside username -->
+        <a href="{{ url_for('edit_user_tasks', user_id=(users_tasks.keys()|list).index(username) + 1) }}" class="edit-btn">Edit</a>
+      </div>
+
+      {% if tasks %}
+        <ul class="task-list">
+          {% for task_name, completed in tasks %}
+            <li class="task-item">
+              <span>{{ task_name }}</span>
+              <span class="{{ 'completed' if completed else 'not-completed' }}">
+                {{ 'Completed' if completed else 'Incomplete' }}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No tasks found for this user.</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
+

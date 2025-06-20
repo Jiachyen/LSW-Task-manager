@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Tasks - LSW Task Manager{% endblock %}
+
+{% block content %}
+<div class="assign-container">
+    <div class="assign-header">
+        <h2>Assign Tasks</h2>
+        <p>Create new tasks and assign them to your team members</p>
+    </div>
+
+    <div class="assign-form-section">
+        <div class="assign-card">
+            <h3>Create New Task</h3>
+            <form method="POST" action="{{ url_for('assign_task') }}" class="assign-form">
+                <div class="form-group">
+                    <label for="task_name">Task Name:</label>
+                    <input type="text" id="task_name" name="task_name" required class="form-control" 
+                           placeholder="Enter task description...">
+                </div>
+                
+                <div class="form-group">
+                    <label for="assigned_to">Assign to:</label>
+                    <select id="assigned_to" name="assigned_to" required class="form-control">
+                        <option value="">Select team member...</option>
+                        {% for report in direct_reports %}
+                        <option value="{{ report.email }}">
+                            {{ report.first_name }} {{ report.last_name }} ({{ report.email }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Assign Task</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="team-section">
+        <div class="team-card">
+            <h3>Your Team</h3>
+            {% if direct_reports %}
+                <div class="team-members">
+                    {% for report in direct_reports %}
+                    <div class="team-member">
+                        <div class="member-info">
+                            <h4>{{ report.first_name }} {{ report.last_name }}</h4>
+                            <span class="member-email">{{ report.email }}</span>
+                        </div>
+                        <div class="member-actions">
+                            <a href="{{ url_for('overview') }}" class="btn btn-outline">View Tasks</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="no-team">
+                    <p>No direct reports found.</p>
+                    <p>Team members will appear here once they are added to the system.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="quick-actions">
+        <div class="actions-card">
+            <h3>Quick Actions</h3>
+            <div class="action-buttons">
+                <a href="{{ url_for('overview') }}" class="btn btn-secondary">View Team Overview</a>
+                <a href="{{ url_for('home') }}" class="btn btn-outline">Back to Home</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
