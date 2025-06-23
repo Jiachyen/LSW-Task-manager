@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from models import *
 from auth import *
 import os
+from datetime import date
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')  # Use environment variable in production
@@ -89,13 +90,25 @@ def logout():
 @app.route('/home')
 @require_auth
 def home():
-    user = get_current_user()
-    if user:
-        print(f"User logged in: {user['email']}")
-        tasks = get_this_week_tasks(user['email'])
-        print(f"Passing {len(tasks)} tasks to template for user {user['email']}")
-        return render_template('home.html', tasks=tasks, user=user)
-    return redirect(url_for('login'))
+    try:
+        user = get_current_user()
+        if user:
+            print(f"User logged in: {user['email']}")
+            tasks = get_this_week_tasks(user['email'])
+            print(f"Passing {len(tasks)} tasks to template for user {user['email']}")
+            today = date.today().isoformat()
+            # Calculate future dates for template comparison
+            from datetime import timedelta
+            today_date = date.today()
+            three_days_later = (today_date + timedelta(days=3)).isoformat()
+            print(f"Today's date: {today}")
+            return render_template('home.html', tasks=tasks, user=user, today=today, three_days_later=three_days_later)
+        return redirect(url_for('login'))
+    except Exception as e:
+        print(f"Error in home route: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error: {str(e)}", 500
 
 @app.route('/overview')
 @require_manager
@@ -103,7 +116,12 @@ def overview():
     user = get_current_user()
     if user:
         overview_data = get_manager_overview(user['email'])
-        return render_template('overview.html', overview_data=overview_data, user=user)
+        today = date.today().isoformat()
+        # Calculate future dates for template comparison
+        from datetime import timedelta
+        today_date = date.today()
+        three_days_later = (today_date + timedelta(days=3)).isoformat()
+        return render_template('overview.html', overview_data=overview_data, user=user, today=today, three_days_later=three_days_later)
     return redirect(url_for('login'))
 
 @app.route('/assign')
@@ -120,9 +138,10 @@ def assign():
 def assign_task():
     task_name = request.form.get('task_name')
     assigned_to = request.form.get('assigned_to')
+    due_date = request.form.get('due_date')  # New due date field
     
     if task_name and assigned_to:
-        add_task(task_name, assigned_to)
+        add_task(task_name, assigned_to, due_date)
         flash(f'Task "{task_name}" assigned successfully!', 'success')
     else:
         flash('Please provide both task name and assignee', 'error')
@@ -155,8 +174,9 @@ def add_own_task():
     user = get_current_user()
     if user:
         task_name = request.form.get('task_name')
+        due_date = request.form.get('due_date')  # New due date field
         if task_name:
-            add_task(task_name, user['email'])
+            add_task(task_name, user['email'], due_date)
             flash(f'Task "{task_name}" added successfully!', 'success')
         else:
             flash('Please provide a task name', 'error')
@@ -184,10 +204,34 @@ def delete_own_task():
     
     return redirect(url_for('home'))
 
+@app.route('/update_task_due_date', methods=['POST'])
+@require_auth
+def update_task_due_date_route():
+    user = get_current_user()
+    if user:
+        task_id = request.form.get('task_id')
+        due_date = request.form.get('due_date')
+        
+        if task_id:
+            # Verify the task belongs to the current user
+            tasks = get_user_tasks(user['email'])
+            task_exists = any(str(task['id']) == str(task_id) for task in tasks)
+            
+            if task_exists:
+                from models import update_task_due_date
+                update_task_due_date(int(task_id), due_date if due_date else None)
+                flash('Task due date updated successfully!', 'success')
+            else:
+                flash('Task not found or you do not have permission to update it.', 'error')
+        else:
+            flash('Task ID is required', 'error')
+    
+    return redirect(url_for('home'))
+
 if __name__ == '__main__':
     # Get port from environment variable (for deployment) or use 5000 for local development
     port = int(os.environ.get('PORT', 5000))
     
     # For deployment platforms, always bind to 0.0.0.0
     print(f"Starting LSW Task Manager on port {port}")
-    app.run(debug=False, host='0.0.0.0', port=port) 
+    app.run(debug=True, host='0.0.0.0', port=port) 
