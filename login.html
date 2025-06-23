@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Login - LSW Task Manager{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <h2>Login to LSW Task Manager</h2>
+        <form method="POST" class="login-form" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required class="form-control">
+                <small class="form-text">Note: Any password will work as long as the email exists in the system.</small>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>New user? <a href="{{ url_for('register') }}">Create an account here</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

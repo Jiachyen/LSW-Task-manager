@@ -60,6 +60,27 @@ def login():
     
     return render_template('login.html')
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        email = request.form['email']
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
+        manager_email = request.form.get('manager_email')  # Optional
+        
+        # Check if user already exists
+        existing_user = get_user_by_email(email)
+        if existing_user:
+            flash('User with this email already exists', 'error')
+            return render_template('register.html')
+        
+        # Add the new user
+        add_user(email, first_name, last_name, manager_email)
+        flash('Registration successful! You can now login.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
 @app.route('/logout')
 def logout():
     logout_user()
@@ -70,7 +91,9 @@ def logout():
 def home():
     user = get_current_user()
     if user:
+        print(f"User logged in: {user['email']}")
         tasks = get_this_week_tasks(user['email'])
+        print(f"Passing {len(tasks)} tasks to template for user {user['email']}")
         return render_template('home.html', tasks=tasks, user=user)
     return redirect(url_for('login'))
 
