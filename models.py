@@ -1,193 +1,158 @@
 import sqlite3
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 
 DATABASE_PATH = 'lsw.db'
 
 def get_db_connection():
     """Create a database connection"""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=20.0)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Initialize the database with required tables"""
+    """Initialize the database and create tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Create Users table
-    cursor.execute('''
+    # Create users table
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
-            manager_email TEXT,
-            FOREIGN KEY (manager_email) REFERENCES users (email)
-        )
-    ''')
+            manager_email TEXT
+        );
+    """)
     
-    # Create Tasks table
-    cursor.execute('''
+    # Create tasks table
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             assigned_to TEXT NOT NULL,
-            start_date DATE NOT NULL,
-            completed BOOLEAN DEFAULT FALSE,
-            FOREIGN KEY (assigned_to) REFERENCES users (email)
-        )
-    ''')
+            start_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed BOOLEAN NOT NULL DEFAULT FALSE
+        );
+    """)
     
     conn.commit()
     conn.close()
 
-def add_user(email, first_name, last_name, manager_email=None):
-    """Add a new user to the database"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
+def execute_query(query: str, params: tuple = (), fetchone=False, fetchall=False, commit=False) -> Any:
+    """Execute a database query safely"""
+    conn = None
     try:
-        cursor.execute('''
-            INSERT INTO users (email, first_name, last_name, manager_email)
-            VALUES (?, ?, ?, ?)
-        ''', (email, first_name, last_name, manager_email))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        
+        result = None
+        if fetchone:
+            result = cursor.fetchone()
+        if fetchall:
+            result = cursor.fetchall()
+        if commit:
+            conn.commit()
+            
+        return result
+    except Exception as e:
+        print(f"Database query error: {e}")
+        if commit and conn:
+            conn.rollback()
+        return None if fetchone else []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
-def get_user_by_email(email):
-    """Get user by email"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-    user = cursor.fetchone()
-    conn.close()
-    
-    return user
+def add_user(email: str, first_name: str, last_name: str, manager_email: Optional[str] = None):
+    """Add a new user to the database"""
+    query = "INSERT INTO users (email, first_name, last_name, manager_email) VALUES (?, ?, ?, ?)"
+    execute_query(query, (email, first_name, last_name, manager_email), commit=True)
 
-def get_all_users():
-    """Get all users"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT * FROM users ORDER BY first_name, last_name')
-    users = cursor.fetchall()
-    conn.close()
-    
-    return users
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Get a user by their email address"""
+    query = "SELECT * FROM users WHERE email = ?"
+    return execute_query(query, (email,), fetchone=True)
 
-def get_direct_reports(manager_email):
+def get_direct_reports(manager_email: str) -> List[Dict[str, Any]]:
     """Get all direct reports for a manager"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT * FROM users WHERE manager_email = ? ORDER BY first_name, last_name', (manager_email,))
-    direct_reports = cursor.fetchall()
-    conn.close()
-    
-    return direct_reports
+    query = "SELECT * FROM users WHERE manager_email = ?"
+    return execute_query(query, (manager_email,), fetchall=True)
 
-def add_task(name, assigned_to):
+def get_user_tasks(email: str) -> List[Dict[str, Any]]:
+    """Get all tasks for a user"""
+    email = email.strip().lower()
+    query = "SELECT * FROM tasks WHERE assigned_to = ? ORDER BY start_date DESC"
+    return execute_query(query, (email,), fetchall=True)
+
+def get_this_week_tasks(email: str) -> List[Dict[str, Any]]:
+    """Get tasks for a user for the current week"""
+    email = email.strip().lower()
+    print(f"Fetching tasks for email: '{email}'")
+    query = "SELECT * FROM tasks WHERE assigned_to = ? ORDER BY start_date DESC"
+    result = execute_query(query, (email,), fetchall=True)
+    print(f"Fetched {len(result)} tasks for {email}")
+    for task in result:
+        print(f"  - Task: {task['name']} (ID: {task['id']}, Completed: {task['completed']})")
+    return result
+    
+def add_task(name: str, assigned_to: str):
     """Add a new task"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        INSERT INTO tasks (name, assigned_to, start_date)
-        VALUES (?, ?, ?)
-    ''', (name, assigned_to, datetime.now().date()))
-    conn.commit()
-    conn.close()
+    assigned_to = assigned_to.strip().lower()
+    print(f"Adding task: '{name}' to '{assigned_to}'")
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    query = "INSERT INTO tasks (name, assigned_to, start_date) VALUES (?, ?, ?)"
+    try:
+        result = execute_query(query, (name, assigned_to, current_time), commit=True)
+        print(f"Task added successfully: {result}")
+    except Exception as e:
+        print(f"Failed to add task: {e}")
+    return result
 
-def get_user_tasks(email):
-    """Get all tasks for a specific user"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT * FROM tasks 
-        WHERE assigned_to = ? 
-        ORDER BY start_date DESC
-    ''', (email,))
-    tasks = cursor.fetchall()
-    conn.close()
-    
-    return tasks
-
-def get_this_week_tasks(email):
-    """Get tasks for this week for a specific user"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Get the start of this week (Monday)
-    from datetime import datetime, timedelta
-    today = datetime.now().date()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
-    
-    cursor.execute('''
-        SELECT * FROM tasks 
-        WHERE assigned_to = ? 
-        AND start_date BETWEEN ? AND ?
-        ORDER BY start_date DESC
-    ''', (email, start_of_week, end_of_week))
-    tasks = cursor.fetchall()
-    conn.close()
-    
-    return tasks
-
-def mark_task_completed(task_id):
+def mark_task_completed(task_id: int):
     """Mark a task as completed"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('UPDATE tasks SET completed = TRUE WHERE id = ?', (task_id,))
-    conn.commit()
-    conn.close()
+    query = "UPDATE tasks SET completed = TRUE WHERE id = ?"
+    execute_query(query, (task_id,), commit=True)
 
-def mark_task_uncompleted(task_id):
-    """Mark a task as incomplete"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+def mark_task_uncompleted(task_id: int):
+    """Mark a task as not completed"""
+    query = "UPDATE tasks SET completed = FALSE WHERE id = ?"
+    execute_query(query, (task_id,), commit=True)
     
-    cursor.execute('UPDATE tasks SET completed = FALSE WHERE id = ?', (task_id,))
-    conn.commit()
-    conn.close()
+def delete_task(task_id: int):
+    """Delete a task"""
+    query = "DELETE FROM tasks WHERE id = ?"
+    execute_query(query, (task_id,), commit=True)
 
-def delete_task(task_id):
-    """Delete a task from the database"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
-    conn.commit()
-    conn.close()
-
-def get_manager_overview(manager_email):
-    """Get overview of direct reports' task completion for this week"""
+def get_manager_overview(manager_email: str) -> List[Dict[str, Any]]:
+    """Get an overview of team task completion for a manager"""
     direct_reports = get_direct_reports(manager_email)
     overview = []
     
+    if not direct_reports:
+        return []
+
     for report in direct_reports:
-        tasks = get_this_week_tasks(report['email'])
+        email = report['email']
+        tasks = get_user_tasks(email)
+        
         completed_count = sum(1 for task in tasks if task['completed'])
         total_count = len(tasks)
+        completion_rate = (completed_count / total_count * 100) if total_count > 0 else 0
         
         overview.append({
             'user': report,
-            'tasks': tasks,
             'completed_count': completed_count,
             'total_count': total_count,
-            'completion_rate': (completed_count / total_count * 100) if total_count > 0 else 0
+            'completion_rate': round(completion_rate, 1),
+            'tasks': tasks
         })
-    
     return overview
 
 # Initialize database when module is imported
-if not os.path.exists(DATABASE_PATH):
+if not os.path.exists('lsw.db'):
     init_db() 
+    
