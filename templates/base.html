@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>{% block title %}Stryker LSW Task Manager{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <h1>LSW Task Manager</h1>
+      </div>
+      {% if session.user_email %}
+      <div class="nav-menu">
+        <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+        {% if session.is_manager %}
+        <a href="{{ url_for('overview') }}" class="nav-link">Overview</a>
+        <a href="{{ url_for('assign') }}" class="nav-link">Assign Tasks</a>
+        {% endif %}
+        <span class="nav-user">Welcome, {{ session.user_name }}</span>
+        <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+      </div>
+      {% endif %}
+    </div>
+  </nav>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
+

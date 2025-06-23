@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Overview - LSW Task Manager{% endblock %}
+
+{% block content %}
+<div class="overview-container">
+    <div class="overview-header">
+        <h2>Team Overview</h2>
+        <p>Current task completion status for this week</p>
+    </div>
+
+    <div class="overview-grid">
+        {% if overview_data %}
+            {% for report in overview_data %}
+            <div class="report-card">
+                <div class="report-header">
+                    <h3>{{ report.user.first_name }} {{ report.user.last_name }}</h3>
+                    <span class="report-email">{{ report.user.email }}</span>
+                </div>
+                
+                <div class="completion-stats">
+                    <div class="completion-bar">
+                        <div class="completion-fill" style="width: {{ report.completion_rate }}%"></div>
+                    </div>
+                    <div class="completion-text">
+                        {{ report.completed_count }} of {{ report.total_count }} tasks completed
+                        <span class="completion-percentage">({{ "%.1f"|format(report.completion_rate) }}%)</span>
+                    </div>
+                </div>
+
+                <div class="tasks-list">
+                    <h4>This Week's Tasks:</h4>
+                    {% if report.tasks %}
+                        <ul class="task-list">
+                            {% for task in report.tasks %}
+                            <li class="task-item {% if task.completed %}completed{% endif %}">
+                                <div class="task-info">
+                                    <span class="task-name">{{ task.name }}</span>
+                                    {% if task.due_date %}
+                                        <span class="task-due-date {% if task.completed %}completed{% elif task.due_date and today and task.due_date < today %}overdue{% elif task.due_date and today and task.due_date == today %}due-today{% elif task.due_date and today and task.due_date <= three_days_later %}due-soon{% else %}on-track{% endif %}">
+                                            Due: {{ task.due_date }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <span class="task-status">
+                                    {% if task.completed %}
+                                        ✓ Completed
+                                    {% elif task.due_date and today and task.due_date < today %}
+                                        ⚠️ Overdue
+                                    {% elif task.due_date and today and task.due_date == today %}
+                                        📅 Due Today
+                                    {% elif task.due_date and today and task.due_date <= three_days_later %}
+                                        ⏰ Due Soon
+                                    {% else %}
+                                        ⏳ Pending
+                                    {% endif %}
+                                </span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="no-tasks">No tasks assigned this week</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-reports">
+                <p>No direct reports found.</p>
+                <p>Direct reports will appear here once they are added to the system.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="summary-section">
+        <div class="summary-card">
+            <h3>Team Summary</h3>
+            <div class="summary-stats">
+                <div class="summary-item">
+                    <span class="summary-number">{{ overview_data|length }}</span>
+                    <span class="summary-label">Team Members</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-number">
+                        {{ overview_data|sum(attribute='total_count') }}
+                    </span>
+                    <span class="summary-label">Total Tasks</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-number">
+                        {{ overview_data|sum(attribute='completed_count') }}
+                    </span>
+                    <span class="summary-label">Completed Tasks</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-number">
+                        {% set total_tasks = overview_data|sum(attribute='total_count') %}
+                        {% set completed_tasks = overview_data|sum(attribute='completed_count') %}
+                        {% if total_tasks > 0 %}
+                            {{ "%.1f"|format((completed_tasks / total_tasks) * 100) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </span>
+                    <span class="summary-label">Team Completion Rate</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.task-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.task-due-date {
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.task-due-date.overdue {
+    color: #e74c3c;
+}
+
+.task-due-date.due-today {
+    color: #f39c12;
+}
+
+.task-due-date.due-soon {
+    color: #f39c12;
+}
+
+.task-due-date.on-track {
+    color: #27ae60;
+}
+
+.task-due-date.completed {
+    color: #28a745;
+    text-decoration: line-through;
+}
+</style>
+
+{% endblock %} 

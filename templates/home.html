@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Home - LSW Task Manager{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <div class="welcome-section">
+        <h2>Welcome, {{ user.first_name }} {{ user.last_name }}</h2>
+        <p>Here are your tasks for this week:</p>
+    </div>
+
+    <!-- Add Task Section for Employees and Managers -->
+    <div class="add-task-section">
+        <div class="add-task-card">
+            <h3>Add Your Own Task</h3>
+            <form method="POST" action="{{ url_for('add_own_task') }}" class="add-task-form">
+                <div class="form-group">
+                    <label for="task_name">Task Name:</label>
+                    <input type="text" id="task_name" name="task_name" required class="form-control" 
+                           placeholder="Enter your task description...">
+                </div>
+                <div class="form-group">
+                    <label for="due_date">Due Date (Optional):</label>
+                    <input type="date" id="due_date" name="due_date" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Task</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="tasks-section">
+        {% if tasks %}
+            <div class="tasks-grid">
+                {% for task in tasks %}
+                <div class="task-card {% if task.completed %}completed{% endif %}">
+                    <div class="task-header">
+                        <h3>{{ task.name }}</h3>
+                        <span class="task-date">{{ task.start_date }}</span>
+                    </div>
+                    
+                    <!-- Due Date Display -->
+                    {% if task.due_date %}
+                        <div class="due-date-section">
+                            <span class="due-date-label">Due:</span>
+                            <span class="due-date {% if task.completed %}completed{% elif task.due_date and today and task.due_date < today %}overdue{% elif task.due_date and today and task.due_date == today %}due-today{% elif task.due_date and today and task.due_date <= three_days_later %}due-soon{% else %}on-track{% endif %}">
+                                {{ task.due_date }}
+                            </span>
+                            {% if not task.completed %}
+                                {% if task.due_date and today and task.due_date < today %}
+                                    <span class="status-badge overdue">⚠️ Overdue</span>
+                                {% elif task.due_date and today and task.due_date == today %}
+                                    <span class="status-badge due-today">📅 Due Today</span>
+                                {% elif task.due_date and today and task.due_date <= three_days_later %}
+                                    <span class="status-badge due-soon">⏰ Due Soon</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="due-date-section">
+                            <span class="due-date-label">Due:</span>
+                            <span class="due-date no-due-date">No due date set</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="task-status">
+                        {% if task.completed %}
+                            <span class="status-badge completed">✓ Completed</span>
+                        {% else %}
+                            <span class="status-badge pending">⏳ Pending</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="task-actions">
+                        {% if not task.completed %}
+                        <form method="POST" action="{{ url_for('complete_task') }}" class="task-action">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <button type="submit" class="btn btn-success">Mark as Completed</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('uncomplete_task') }}" class="task-action">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <button type="submit" class="btn btn-warning">Mark as Incomplete</button>
+                        </form>
+                        {% endif %}
+                        
+                        <!-- Edit Due Date Button -->
+                        <button type="button" class="btn btn-info edit-due-date-btn" 
+                                data-task-id="{{ task.id }}" 
+                                data-current-due-date="{{ task.due_date or '' }}">
+                            Edit Due Date
+                        </button>
+                        
+                        <!-- Delete button for all users -->
+                        <form method="POST" action="{{ url_for('delete_own_task') }}" class="task-action delete-task-form">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <button type="submit" class="btn btn-danger">Delete Task</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-tasks">
+                <p>No tasks assigned for this week.</p>
+                <p>Check back later or contact your manager for new assignments.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="stats-section">
+        <div class="stats-card">
+            <h3>This Week's Progress</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number">{{ tasks|length }}</span>
+                    <span class="stat-label">Total Tasks</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ tasks|selectattr('completed', 'equalto', True)|list|length }}</span>
+                    <span class="stat-label">Completed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ tasks|selectattr('completed', 'equalto', False)|list|length }}</span>
+                    <span class="stat-label">Pending</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">
+                        {% set overdue_count = 0 %}
+                        {% for task in tasks %}
+                            {% if task.due_date and today and task.due_date < today and not task.completed %}
+                                {% set overdue_count = overdue_count + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ overdue_count }}
+                    </span>
+                    <span class="stat-label">Overdue</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Due Date Edit Modal -->
+<div id="dueDateModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Edit Due Date</h3>
+        <form method="POST" action="{{ url_for('update_task_due_date_route') }}" id="dueDateForm">
+            <input type="hidden" name="task_id" id="modalTaskId">
+            <div class="form-group">
+                <label for="modalDueDate">Due Date:</label>
+                <input type="date" id="modalDueDate" name="due_date" class="form-control">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Update Due Date</button>
+                <button type="button" class="btn btn-secondary" onclick="clearDueDate()">Clear Due Date</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.due-date-section {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.due-date-label {
+    font-weight: bold;
+    color: #666;
+}
+
+.due-date {
+    font-weight: 500;
+}
+
+.due-date.overdue {
+    color: #e74c3c;
+}
+
+.due-date.due-today {
+    color: #f39c12;
+}
+
+.due-date.due-soon {
+    color: #f39c12;
+}
+
+.due-date.on-track {
+    color: #27ae60;
+}
+
+.due-date.no-due-date {
+    color: #95a5a6;
+    font-style: italic;
+}
+
+.due-date.completed {
+    color: #28a745;
+    text-decoration: line-through;
+}
+
+.status-badge.overdue {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.status-badge.due-today {
+    background-color: #f39c12;
+    color: white;
+}
+
+.status-badge.due-soon {
+    background-color: #f39c12;
+    color: white;
+}
+
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 500px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+</style>
+
+<script>
+// Modal functionality
+const modal = document.getElementById('dueDateModal');
+const closeBtn = document.getElementsByClassName('close')[0];
+
+// Open modal when edit due date button is clicked
+document.querySelectorAll('.edit-due-date-btn').forEach(button => {
+    button.addEventListener('click', () => {
+        const taskId = button.getAttribute('data-task-id');
+        const currentDueDate = button.getAttribute('data-current-due-date');
+        
+        document.getElementById('modalTaskId').value = taskId;
+        document.getElementById('modalDueDate').value = currentDueDate;
+        modal.style.display = 'block';
+    });
+});
+
+// Close modal when X is clicked
+closeBtn.onclick = closeModal;
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target == modal) {
+        closeModal();
+    }
+}
+
+function closeModal() {
+    modal.style.display = 'none';
+}
+
+function clearDueDate() {
+    document.getElementById('modalDueDate').value = '';
+}
+</script>
+{% endblock %} 
